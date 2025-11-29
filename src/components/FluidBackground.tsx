@@ -297,7 +297,18 @@ const FluidBackground: React.FC = () => {
       }
     };
 
+    // Set up buffer BEFORE initial splats (required for drawing)
+    gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(0);
+
+    // Initial splats
     multipleSplats(Math.floor(Math.random() * 20) + 5);
+
+    // Also add delayed splats to ensure they appear even if first batch fails
+    const splatTimeout = setTimeout(() => {
+      multipleSplats(Math.floor(Math.random() * 15) + 5);
+    }, 100);
 
     const update = () => {
       const dt = 0.016;
@@ -469,6 +480,7 @@ const FluidBackground: React.FC = () => {
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('resize', handleResize);
+      clearTimeout(splatTimeout);
     };
   }, []);
 
