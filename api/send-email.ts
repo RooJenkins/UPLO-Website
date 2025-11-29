@@ -54,6 +54,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(500).json({ error: 'Failed to send email' });
     }
 
+    // Send confirmation copy to the user
+    await resend.emails.send({
+      from: 'UPLO <onboarding@resend.dev>',
+      to: [email],
+      subject: `Your message to UPLO - Confirmation`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #333; border-bottom: 2px solid #eee; padding-bottom: 10px;">
+            Thanks for reaching out!
+          </h2>
+          <p style="color: #555; font-size: 16px;">
+            Hi ${name}, we've received your message and will get back to you soon.
+          </p>
+          <div style="background: #f9f9f9; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h3 style="margin-top: 0; color: #555;">Your message:</h3>
+            <p style="white-space: pre-wrap; color: #333;">${message}</p>
+          </div>
+          <p style="color: #888; font-size: 14px; margin-top: 30px;">
+            Best regards,<br/>
+            <strong>The UPLO Team</strong>
+          </p>
+          <p style="color: #aaa; font-size: 12px; margin-top: 20px;">
+            This is an automated confirmation. Please don't reply to this email.
+          </p>
+        </div>
+      `,
+    });
+
     return res.status(200).json({ success: true, id: data?.id });
   } catch (error) {
     console.error('Server error:', error);
