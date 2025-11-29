@@ -450,7 +450,29 @@ const FluidBackground: React.FC = () => {
       isMoving = true;
     };
 
+    // Touch event handlers for mobile
+    const handleTouchStart = (e: TouchEvent) => {
+      e.preventDefault();
+      const touch = e.touches[0];
+      lastMouseX = touch.clientX;
+      lastMouseY = touch.clientY;
+      mouseX = touch.clientX;
+      mouseY = touch.clientY;
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      e.preventDefault();
+      const touch = e.touches[0];
+      lastMouseX = mouseX;
+      lastMouseY = mouseY;
+      mouseX = touch.clientX;
+      mouseY = touch.clientY;
+      isMoving = true;
+    };
+
     window.addEventListener('mousemove', handleMouseMove);
+    canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+    canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
 
     // Resize handler
     const handleResize = () => {
@@ -480,6 +502,8 @@ const FluidBackground: React.FC = () => {
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('resize', handleResize);
+      canvas.removeEventListener('touchstart', handleTouchStart);
+      canvas.removeEventListener('touchmove', handleTouchMove);
       clearTimeout(splatTimeout);
     };
   }, []);
@@ -497,6 +521,7 @@ const FluidBackground: React.FC = () => {
         height: '100%',
         zIndex: 0,
         background: '#000',
+        touchAction: 'none',
       }}
     />
   );
