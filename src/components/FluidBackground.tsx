@@ -210,8 +210,8 @@ const FluidBackground: React.FC = () => {
     };
 
     // Determine best available texture type by testing
-    let textureType = gl.UNSIGNED_BYTE;
-    let filterType = gl.NEAREST; // Start with NEAREST which has better support
+    let textureType: number = gl.UNSIGNED_BYTE;
+    let filterType: number = gl.NEAREST; // Start with NEAREST which has better support
 
     if (floatExt && testTextureType(gl.FLOAT)) {
       textureType = gl.FLOAT;
