@@ -449,7 +449,18 @@ const FluidBackground: React.FC = () => {
       canvas.height = height;
       simWidth = width >> 1;
       simHeight = height >> 1;
-      // Re-init FBOs if needed, but for now just scaling works okay-ish or we accept stretch
+
+      // Recreate all FBOs with new dimensions
+      density = createFBO(simWidth, simHeight);
+      densityTemp = createFBO(simWidth, simHeight);
+      velocity = createFBO(simWidth, simHeight);
+      velocityTemp = createFBO(simWidth, simHeight);
+      divergence = createFBO(simWidth, simHeight);
+      pressure = createFBO(simWidth, simHeight);
+      pressureTemp = createFBO(simWidth, simHeight);
+
+      // Add new splats after resize so it's not empty
+      multipleSplats(Math.floor(Math.random() * 10) + 3);
     };
     window.addEventListener('resize', handleResize);
 
