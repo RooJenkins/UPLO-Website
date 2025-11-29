@@ -47,25 +47,24 @@ const FluidBackground: React.FC = () => {
     `;
 
     const displayShaderSource = `
-      precision mediump float;
+      precision highp float;
       uniform sampler2D u_texture;
       uniform vec2 u_resolution;
       void main() {
         vec2 uv = gl_FragCoord.xy / u_resolution;
         vec4 color = texture2D(u_texture, uv);
-        // Add a cool gradient map or just output the color
         gl_FragColor = vec4(color.rgb, 1.0);
       }
     `;
 
     const splatShaderSource = `
-      precision mediump float;
+      precision highp float;
       uniform sampler2D u_texture;
       uniform vec2 u_point;
       uniform vec3 u_color;
       uniform float u_radius;
       uniform vec2 u_resolution;
-      
+
       void main() {
         vec2 uv = gl_FragCoord.xy / u_resolution;
         vec2 p = uv - u_point.xy;
@@ -77,7 +76,7 @@ const FluidBackground: React.FC = () => {
     `;
 
     const advectionShaderSource = `
-      precision mediump float;
+      precision highp float;
       uniform sampler2D u_velocity;
       uniform sampler2D u_source;
       uniform vec2 u_texelSize;
@@ -94,7 +93,7 @@ const FluidBackground: React.FC = () => {
     `;
 
     const divergenceShaderSource = `
-      precision mediump float;
+      precision highp float;
       uniform sampler2D u_velocity;
       uniform vec2 u_texelSize;
       uniform vec2 u_resolution;
@@ -105,14 +104,14 @@ const FluidBackground: React.FC = () => {
         float R = texture2D(u_velocity, uv + vec2(u_texelSize.x, 0.0)).x;
         float T = texture2D(u_velocity, uv + vec2(0.0, u_texelSize.y)).y;
         float B = texture2D(u_velocity, uv - vec2(0.0, u_texelSize.y)).y;
-        
+
         float div = 0.5 * (R - L + T - B);
         gl_FragColor = vec4(div, 0.0, 0.0, 1.0);
       }
     `;
 
     const pressureShaderSource = `
-      precision mediump float;
+      precision highp float;
       uniform sampler2D u_pressure;
       uniform sampler2D u_divergence;
       uniform vec2 u_texelSize;
@@ -124,16 +123,15 @@ const FluidBackground: React.FC = () => {
         float R = texture2D(u_pressure, uv + vec2(u_texelSize.x, 0.0)).x;
         float T = texture2D(u_pressure, uv + vec2(0.0, u_texelSize.y)).x;
         float B = texture2D(u_pressure, uv - vec2(0.0, u_texelSize.y)).x;
-        float C = texture2D(u_pressure, uv).x;
         float div = texture2D(u_divergence, uv).x;
-        
+
         float pressure = (L + R + T + B - div) * 0.25;
         gl_FragColor = vec4(pressure, 0.0, 0.0, 1.0);
       }
     `;
 
     const gradientSubtractShaderSource = `
-      precision mediump float;
+      precision highp float;
       uniform sampler2D u_pressure;
       uniform sampler2D u_velocity;
       uniform vec2 u_texelSize;
@@ -145,7 +143,7 @@ const FluidBackground: React.FC = () => {
         float R = texture2D(u_pressure, uv + vec2(u_texelSize.x, 0.0)).x;
         float T = texture2D(u_pressure, uv + vec2(0.0, u_texelSize.y)).x;
         float B = texture2D(u_pressure, uv - vec2(0.0, u_texelSize.y)).x;
-        
+
         vec2 velocity = texture2D(u_velocity, uv).xy;
         velocity.xy -= vec2(R - L, T - B);
         gl_FragColor = vec4(velocity, 0.0, 1.0);
@@ -183,27 +181,72 @@ const FluidBackground: React.FC = () => {
     let simWidth = width >> 1;
     let simHeight = height >> 1;
 
+    // Check for float texture support - try multiple approaches
+    const floatExt = gl.getExtension('OES_texture_float');
+    gl.getExtension('OES_texture_float_linear');
+    const halfFloatExt = gl.getExtension('OES_texture_half_float');
+    gl.getExtension('OES_texture_half_float_linear');
+
+    // Function to test if a texture type works for rendering
+    const testTextureType = (type: number): boolean => {
+      const testTexture = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, testTexture);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 4, 4, 0, gl.RGBA, type, null);
+
+      const testFbo = gl.createFramebuffer();
+      gl.bindFramebuffer(gl.FRAMEBUFFER, testFbo);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, testTexture, 0);
+      const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.deleteFramebuffer(testFbo);
+      gl.deleteTexture(testTexture);
+
+      return status === gl.FRAMEBUFFER_COMPLETE;
+    };
+
+    // Determine best available texture type by testing
+    let textureType = gl.UNSIGNED_BYTE;
+    let filterType = gl.NEAREST; // Start with NEAREST which has better support
+
+    if (floatExt && testTextureType(gl.FLOAT)) {
+      textureType = gl.FLOAT;
+      filterType = gl.LINEAR;
+    } else if (halfFloatExt && testTextureType(halfFloatExt.HALF_FLOAT_OES)) {
+      textureType = halfFloatExt.HALF_FLOAT_OES;
+      filterType = gl.LINEAR;
+    }
+
     const createFBO = (w: number, h: number) => {
       const texture = gl.createTexture();
       gl.bindTexture(gl.TEXTURE_2D, texture);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filterType);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filterType);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.FLOAT, null);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, textureType, null);
 
       const fbo = gl.createFramebuffer();
       gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
       gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
+
+      // Double-check framebuffer is complete, fallback if needed
+      const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+      if (status !== gl.FRAMEBUFFER_COMPLETE) {
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      }
+
       gl.viewport(0, 0, w, h);
       gl.clear(gl.COLOR_BUFFER_BIT);
 
       return { texture, fbo, width: w, height: h };
     };
-
-    // Need float textures
-    gl.getExtension('OES_texture_float');
-    gl.getExtension('OES_texture_float_linear');
 
     let density = createFBO(simWidth, simHeight);
     let densityTemp = createFBO(simWidth, simHeight);
