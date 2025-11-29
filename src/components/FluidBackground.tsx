@@ -452,12 +452,12 @@ const FluidBackground: React.FC = () => {
 
     // Touch event handlers for mobile
     const handleTouchStart = (e: TouchEvent) => {
-      e.preventDefault();
       const touch = e.touches[0];
       lastMouseX = touch.clientX;
       lastMouseY = touch.clientY;
       mouseX = touch.clientX;
       mouseY = touch.clientY;
+      isMoving = true;
     };
 
     const handleTouchMove = (e: TouchEvent) => {
@@ -471,8 +471,8 @@ const FluidBackground: React.FC = () => {
     };
 
     window.addEventListener('mousemove', handleMouseMove);
-    canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
-    canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+    window.addEventListener('touchstart', handleTouchStart, { passive: false });
+    window.addEventListener('touchmove', handleTouchMove, { passive: false });
 
     // Resize handler
     const handleResize = () => {
@@ -502,8 +502,8 @@ const FluidBackground: React.FC = () => {
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('resize', handleResize);
-      canvas.removeEventListener('touchstart', handleTouchStart);
-      canvas.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('touchstart', handleTouchStart);
+      window.removeEventListener('touchmove', handleTouchMove);
       clearTimeout(splatTimeout);
     };
   }, []);
