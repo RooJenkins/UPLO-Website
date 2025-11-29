@@ -1,14 +1,31 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 const FluidBackground: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [isMobile, setIsMobile] = useState(false);
+  const [webglFailed, setWebglFailed] = useState(false);
 
   useEffect(() => {
+    // Detect mobile/touch device
+    const checkMobile = () => {
+      return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+        ('ontouchstart' in window) ||
+        (navigator.maxTouchPoints > 0);
+    };
+    setIsMobile(checkMobile());
+  }, []);
+
+  useEffect(() => {
+    if (isMobile) return; // Skip WebGL on mobile
+
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     const gl = canvas.getContext('webgl');
-    if (!gl) return;
+    if (!gl) {
+      setWebglFailed(true);
+      return;
+    }
 
     // Basic WebGL boilerplate
     function createShader(gl: WebGLRenderingContext, type: number, source: string) {
@@ -159,7 +176,10 @@ const FluidBackground: React.FC = () => {
     const gradientSubtractShader = createShader(gl, gl.FRAGMENT_SHADER, gradientSubtractShaderSource);
     const displayShader = createShader(gl, gl.FRAGMENT_SHADER, displayShaderSource);
 
-    if (!vShader || !splatShader || !advectionShader || !divergenceShader || !pressureShader || !gradientSubtractShader || !displayShader) return;
+    if (!vShader || !splatShader || !advectionShader || !divergenceShader || !pressureShader || !gradientSubtractShader || !displayShader) {
+      setWebglFailed(true);
+      return;
+    }
 
     const splatProgram = createProgram(gl, vShader, splatShader);
     const advectionProgram = createProgram(gl, vShader, advectionShader);
@@ -256,7 +276,7 @@ const FluidBackground: React.FC = () => {
     let pressure = createFBO(simWidth, simHeight);
     let pressureTemp = createFBO(simWidth, simHeight);
 
-    const blit = (destination: any) => {
+    const blit = (destination: ReturnType<typeof createFBO> | null) => {
       gl.bindFramebuffer(gl.FRAMEBUFFER, destination ? destination.fbo : null);
       gl.viewport(0, 0, destination ? destination.width : width, destination ? destination.height : height);
       gl.clear(gl.COLOR_BUFFER_BIT);
@@ -450,29 +470,7 @@ const FluidBackground: React.FC = () => {
       isMoving = true;
     };
 
-    // Touch event handlers for mobile
-    const handleTouchStart = (e: TouchEvent) => {
-      const touch = e.touches[0];
-      lastMouseX = touch.clientX;
-      lastMouseY = touch.clientY;
-      mouseX = touch.clientX;
-      mouseY = touch.clientY;
-      isMoving = true;
-    };
-
-    const handleTouchMove = (e: TouchEvent) => {
-      e.preventDefault();
-      const touch = e.touches[0];
-      lastMouseX = mouseX;
-      lastMouseY = mouseY;
-      mouseX = touch.clientX;
-      mouseY = touch.clientY;
-      isMoving = true;
-    };
-
     window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('touchstart', handleTouchStart, { passive: false });
-    window.addEventListener('touchmove', handleTouchMove, { passive: false });
 
     // Resize handler
     const handleResize = () => {
@@ -502,11 +500,75 @@ const FluidBackground: React.FC = () => {
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('resize', handleResize);
-      window.removeEventListener('touchstart', handleTouchStart);
-      window.removeEventListener('touchmove', handleTouchMove);
       clearTimeout(splatTimeout);
     };
-  }, []);
+  }, [isMobile]);
+
+  // Mobile fallback - animated gradient blobs
+  if (isMobile || webglFailed) {
+    return (
+      <div
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          zIndex: 0,
+          background: '#000',
+          overflow: 'hidden',
+        }}
+      >
+        {/* Animated gradient orbs */}
+        <div
+          style={{
+            position: 'absolute',
+            width: '150vmax',
+            height: '150vmax',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            background: `
+              radial-gradient(circle at 30% 30%, rgba(0, 255, 255, 0.4) 0%, transparent 50%),
+              radial-gradient(circle at 70% 60%, rgba(255, 0, 255, 0.3) 0%, transparent 50%),
+              radial-gradient(circle at 40% 80%, rgba(0, 128, 255, 0.4) 0%, transparent 50%),
+              radial-gradient(circle at 80% 20%, rgba(255, 128, 0, 0.3) 0%, transparent 50%)
+            `,
+            animation: 'mobileFluid 20s ease-in-out infinite',
+          }}
+        />
+        <div
+          style={{
+            position: 'absolute',
+            width: '120vmax',
+            height: '120vmax',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            background: `
+              radial-gradient(circle at 60% 40%, rgba(0, 255, 128, 0.35) 0%, transparent 45%),
+              radial-gradient(circle at 20% 70%, rgba(128, 0, 255, 0.3) 0%, transparent 45%),
+              radial-gradient(circle at 90% 80%, rgba(255, 255, 0, 0.25) 0%, transparent 45%)
+            `,
+            animation: 'mobileFluid2 25s ease-in-out infinite reverse',
+          }}
+        />
+        <style>{`
+          @keyframes mobileFluid {
+            0%, 100% { transform: translate(-50%, -50%) rotate(0deg) scale(1); }
+            25% { transform: translate(-45%, -55%) rotate(90deg) scale(1.1); }
+            50% { transform: translate(-55%, -45%) rotate(180deg) scale(0.95); }
+            75% { transform: translate(-50%, -50%) rotate(270deg) scale(1.05); }
+          }
+          @keyframes mobileFluid2 {
+            0%, 100% { transform: translate(-50%, -50%) rotate(0deg) scale(1); }
+            33% { transform: translate(-55%, -45%) rotate(120deg) scale(1.15); }
+            66% { transform: translate(-45%, -55%) rotate(240deg) scale(0.9); }
+          }
+        `}</style>
+      </div>
+    );
+  }
 
   return (
     <canvas
