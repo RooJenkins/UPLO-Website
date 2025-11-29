@@ -5,8 +5,9 @@ import { ArrowRight, Check, Copy, ArrowUpRight, X, AlertCircle } from 'lucide-re
 const OverlayContent: React.FC = () => {
     const [isExpanded, setIsExpanded] = useState(false);
     const [copied, setCopied] = useState(false);
-    const [formState, setFormState] = useState<'idle' | 'sending' | 'sent'>('idle');
+    const [formState, setFormState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
     const [errors, setErrors] = useState<{ name?: string; email?: string; message?: string }>({});
+    const [submitError, setSubmitError] = useState<string | null>(null);
     const email = "hello@uplo.ai";
 
     const nameRef = useRef<HTMLInputElement>(null);
@@ -25,6 +26,7 @@ const OverlayContent: React.FC = () => {
         setIsExpanded(false);
         setFormState('idle');
         setErrors({});
+        setSubmitError(null);
     };
 
     const validateForm = () => {
@@ -48,21 +50,48 @@ const OverlayContent: React.FC = () => {
         return Object.keys(newErrors).length === 0;
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         e.stopPropagation();
 
         if (!validateForm()) return;
 
         setFormState('sending');
-        setTimeout(() => {
+        setSubmitError(null);
+
+        try {
+            const response = await fetch('/api/send-email', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    name: nameRef.current?.value,
+                    email: emailRef.current?.value,
+                    message: messageRef.current?.value,
+                }),
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to send message');
+            }
+
             setFormState('sent');
+
+            // Clear form fields
+            if (nameRef.current) nameRef.current.value = '';
+            if (emailRef.current) emailRef.current.value = '';
+            if (messageRef.current) messageRef.current.value = '';
+
             setTimeout(() => {
                 setIsExpanded(false);
                 setFormState('idle');
                 setErrors({});
             }, 2000);
-        }, 1500);
+        } catch {
+            setFormState('error');
+            setSubmitError('Failed to send message. Please try again or email us directly.');
+        }
     };
 
     const inputStyle = (hasError: boolean) => ({
@@ -310,6 +339,59 @@ const OverlayContent: React.FC = () => {
                                             <h4 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 500, color: 'white' }}>
                                                 Message Sent
                                             </h4>
+                                        </motion.div>
+                                    ) : formState === 'error' ? (
+                                        <motion.div
+                                            initial={{ opacity: 0, scale: 0.9 }}
+                                            animate={{ opacity: 1, scale: 1 }}
+                                            style={{
+                                                textAlign: 'center',
+                                                padding: '2rem 0',
+                                            }}
+                                        >
+                                            <motion.div
+                                                initial={{ scale: 0 }}
+                                                animate={{ scale: 1 }}
+                                                transition={{ type: 'spring', stiffness: 200, damping: 12 }}
+                                                style={{
+                                                    width: '56px',
+                                                    height: '56px',
+                                                    borderRadius: '50%',
+                                                    background: 'rgba(239, 68, 68, 0.15)',
+                                                    border: '2px solid rgba(239, 68, 68, 0.3)',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    margin: '0 auto 1rem',
+                                                    color: '#f87171',
+                                                }}
+                                            >
+                                                <AlertCircle size={28} />
+                                            </motion.div>
+                                            <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '1.1rem', fontWeight: 500, color: 'white' }}>
+                                                Send Failed
+                                            </h4>
+                                            <p style={{ margin: 0, fontSize: '0.85rem', color: 'rgba(255,255,255,0.6)' }}>
+                                                {submitError}
+                                            </p>
+                                            <motion.button
+                                                onClick={() => setFormState('idle')}
+                                                whileHover={{ backgroundColor: 'rgba(255, 255, 255, 0.12)' }}
+                                                whileTap={{ scale: 0.98 }}
+                                                style={{
+                                                    marginTop: '1rem',
+                                                    background: 'rgba(255, 255, 255, 0.06)',
+                                                    color: 'white',
+                                                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                                                    padding: '0.6rem 1.25rem',
+                                                    borderRadius: '10px',
+                                                    fontSize: '0.85rem',
+                                                    fontWeight: 500,
+                                                    cursor: 'pointer',
+                                                }}
+                                            >
+                                                Try Again
+                                            </motion.button>
                                         </motion.div>
                                     ) : (
                                         <form onSubmit={handleSubmit} onClick={(e) => e.stopPropagation()} noValidate>
