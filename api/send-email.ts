@@ -25,7 +25,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Send email to hello@uplo.ai
     const { data, error } = await resend.emails.send({
-      from: 'UPLO Contact Form <onboarding@resend.dev>',
+      from: 'UPLO Contact Form <noreply@uplo.ai>',
       to: ['hello@uplo.ai'],
       replyTo: email,
       subject: `New Contact Form Submission from ${name}`,
@@ -56,7 +56,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Send confirmation copy to the user
     await resend.emails.send({
-      from: 'UPLO <onboarding@resend.dev>',
+      from: 'UPLO <noreply@uplo.ai>',
       to: [email],
       subject: `Your message to UPLO - Confirmation`,
       html: `
