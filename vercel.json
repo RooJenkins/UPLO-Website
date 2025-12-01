@@ -1,0 +1,19 @@
+{
+  "rewrites": [
+    {
+      "source": "/demo/:id",
+      "destination": "/api/demo/:id"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/demo/:path*",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, s-maxage=3600"
+        }
+      ]
+    }
+  ]
+}
